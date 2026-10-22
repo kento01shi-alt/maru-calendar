@@ -1,0 +1,39 @@
+name: Build home screen icons
+on:
+  push:
+    paths:
+      - '.github/workflows/build-icons.yml'
+      - '.icon-src/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install cairosvg
+      - name: Build PNG icons and add metadata
+        run: |
+          python - <<'PY'
+          import cairosvg, pathlib
+          jobs=[('.icon-src/calendar.svg','apple-touch-icon.png','index.html'),('.icon-src/clock.svg','time-calculator/apple-touch-icon.png','time-calculator/index.html'),('.icon-src/price.svg','price-compare/apple-touch-icon.png','price-compare/index.html')]
+          for src,out,html in jobs:
+              pathlib.Path(out).parent.mkdir(parents=True,exist_ok=True)
+              cairosvg.svg2png(url=src,write_to=out,output_width=180,output_height=180)
+              p=pathlib.Path(html)
+              s=p.read_text()
+              tag='<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png"><link rel="icon" href="apple-touch-icon.png">'
+              if 'rel="apple-touch-icon"' not in s:
+                  s=s.replace('</head>',tag+'</head>',1)
+                  p.write_text(s)
+          PY
+      - name: Commit generated icons
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add apple-touch-icon.png time-calculator/apple-touch-icon.png price-compare/apple-touch-icon.png index.html time-calculator/index.html price-compare/index.html
+          git diff --cached --quiet || (git commit -m 'Apply home screen icons' && git push)
