@@ -1,4 +1,4 @@
-name: Improve ratio units
+name: Show ratio result clearly
 on:
   workflow_dispatch:
   push:
@@ -10,21 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Improve ratio calculator labels and units
+      - name: Show target grams with spoon result
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('time-calculator/index.html')
           s=p.read_text()
-          old='''<section class="app toolPage" id="ratio"><button class="btn backTool" data-back>← 時間の計算へ</button><div class="header">割合・比例計算</div><section class="card"><div class="title">基準</div><div class="toolGrid"><div><div class="toolLabel">基準の量</div><input class="toolInput" id="ratioBase" inputmode="decimal" value="100"></div><div><div class="toolLabel">そのときの量</div><input class="toolInput" id="ratioValue" inputmode="decimal" value="3"></div></div><div class="title" style="margin-top:18px">変更後</div><div class="toolLabel">変更後の量</div><input class="toolInput" id="ratioTarget" inputmode="decimal" value="75"><button class="btn primary" id="ratioCalc" style="margin-top:14px">計算する</button></section><section class="card result"><div class="title">計算結果</div><div class="toolResult" id="ratioOut">2.25</div><div class="summary" id="ratioSummary">100 → 3 の割合なら、75 → 2.25</div></section></section>'''
-          new='''<section class="app toolPage" id="ratio"><button class="btn backTool" data-back>← 時間の計算へ</button><div class="header">割合・比例計算</div><div class="info">例：<b>100gに大さじ3</b>なら、75gでは何杯？</div><section class="card"><div class="title">基準</div><div class="toolGrid"><div><div class="toolLabel">重さ（g）</div><input class="toolInput" id="ratioBase" inputmode="decimal" value="100"></div><div><div class="toolLabel">大さじ・小さじ</div><input class="toolInput" id="ratioValue" inputmode="decimal" value="3"></div></div><div class="switch" style="margin-top:10px"><button class="btn active" id="tbsp">大さじ</button><button class="btn" id="tsp">小さじ</button></div><div class="title" style="margin-top:18px">変更後</div><div class="toolLabel">重さ（g）</div><input class="toolInput" id="ratioTarget" inputmode="decimal" value="75"><button class="btn primary" id="ratioCalc" style="margin-top:14px">計算する</button></section><section class="card result"><div class="title">計算結果</div><div class="toolResult" id="ratioOut">大さじ 2.25</div><div class="summary" id="ratioSummary">100gに大さじ3 → 75gなら大さじ2.25</div></section></section>'''
-          if old in s: s=s.replace(old,new,1)
-          oldjs="function ratio(){let a=+document.getElementById('ratioBase').value,b=+document.getElementById('ratioValue').value,c=+document.getElementById('ratioTarget').value;if(!(a>0)||!Number.isFinite(b)||!Number.isFinite(c))return alert('数値を正しく入力してください');let r=c*b/a;document.getElementById('ratioOut').textContent=nice(r);document.getElementById('ratioSummary').textContent=a+' → '+b+' の割合なら、'+c+' → '+nice(r)}document.getElementById('ratioCalc').onclick=ratio;ratio();"
-          newjs="let spoon='大さじ';function setSpoon(x){spoon=x;document.getElementById('tbsp').classList.toggle('active',x==='大さじ');document.getElementById('tsp').classList.toggle('active',x==='小さじ');ratio()}document.getElementById('tbsp').onclick=()=>setSpoon('大さじ');document.getElementById('tsp').onclick=()=>setSpoon('小さじ');function ratio(){let a=+document.getElementById('ratioBase').value,b=+document.getElementById('ratioValue').value,c=+document.getElementById('ratioTarget').value;if(!(a>0)||!Number.isFinite(b)||!Number.isFinite(c))return alert('数値を正しく入力してください');let r=c*b/a;document.getElementById('ratioOut').textContent=spoon+' '+nice(r);document.getElementById('ratioSummary').textContent=a+'gに'+spoon+b+' → '+c+'gなら'+spoon+nice(r)}document.getElementById('ratioCalc').onclick=ratio;ratio();"
-          if oldjs in s: s=s.replace(oldjs,newjs,1)
+          s=s.replace('<div class="toolResult" id="ratioOut">大さじ 2.25</div>','<div class="toolResult" id="ratioOut">75g → 大さじ2.25</div>')
+          s=s.replace("document.getElementById('ratioOut').textContent=spoon+' '+nice(r);document.getElementById('ratioSummary').textContent=a+'gに'+spoon+b+' → '+c+'gなら'+spoon+nice(r)","document.getElementById('ratioOut').textContent=c+'g → '+spoon+nice(r);document.getElementById('ratioSummary').textContent=a+'gに'+spoon+b+'なら、'+c+'gでは'+spoon+nice(r)")
           p.write_text(s)
           PY
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add time-calculator/index.html
-          git diff --cached --quiet || (git commit -m 'Improve ratio calculator units' && git push)
+          git diff --cached --quiet || (git commit -m 'Show grams in ratio result' && git push)
