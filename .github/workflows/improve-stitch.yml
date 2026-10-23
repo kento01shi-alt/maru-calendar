@@ -1,0 +1,36 @@
+name: Improve screenshot stitching
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/improve-stitch.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.x'}
+      - name: Improve stitch algorithm
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('image-tools/index.html')
+          s=p.read_text()
+          start=s.index('function sample(im,targetW=240)')
+          end=s.index("$('autoStitch').onclick", start)
+          new=r'''function sample(im,targetW=220){let sc=targetW/im.naturalWidth,w=targetW,h=Math.round(im.naturalHeight*sc),c=document.createElement('canvas'),x=c.getContext('2d',{willReadFrequently:true});c.width=w;c.height=h;x.drawImage(im,0,0,w,h);return {d:x.getImageData(0,0,w,h).data,w,h,sc}}
+function regionDiff(a,b,ay,by,hh){let sum=0,n=0,step=3,x0=Math.floor(a.w*.06),x1=Math.floor(a.w*.94);for(let y=0;y<hh;y+=step)for(let x=x0;x<x1;x+=step){let ia=((ay+y)*a.w+x)*4,ib=((by+y)*b.w+x)*4;let ga=(a.d[ia]*3+a.d[ia+1]*6+a.d[ia+2])/10,gb=(b.d[ib]*3+b.d[ib+1]*6+b.d[ib+2])/10;sum+=Math.abs(ga-gb);n++}return sum/Math.max(1,n)}
+function findMatch(A,B){let a=sample(A),b=sample(B),H=Math.min(a.h,b.h),top=Math.round(H*.045),bottom=Math.round(H*.18),band=Math.max(18,Math.round(H*.055)),a0=top,a1=a.h-bottom-band,b0=top,b1=Math.min(b.h-bottom-band,Math.round(b.h*.72)),best={score:1e9,ay:0,by:0};for(let by=b0;by<=b1;by+=3){for(let ay=Math.max(a0,Math.round(a.h*.18));ay<=a1;ay+=3){let sc=regionDiff(a,b,ay,by,band);if(sc<best.score)best={score:sc,ay,by}}}return {aY:Math.round(best.ay/a.sc),bY:Math.round(best.by/b.sc),score:best.score,band:Math.round(band/a.sc)}}
+async function stitch(auto=true){if(shots.length<2)return alert('2枚以上選んでください');let stat=$('stStatus');stat.classList.add('show');stat.textContent='本文の重なりを解析中…';await new Promise(r=>setTimeout(r,40));let matches=[];if(auto){for(let i=0;i<shots.length-1;i++){stat.textContent=`重なりを解析中… ${i+1}/${shots.length-1}`;await new Promise(r=>setTimeout(r,10));matches.push(findMatch(shots[i].im,shots[i+1].im))}}let W=Math.min(...shots.map(s=>s.im.naturalWidth)),scale=Math.min(1,1600/W),w=Math.round(W*scale),pieces=[];if(!auto){shots.forEach(s=>pieces.push({im:s.im,sy:0,sh:s.im.naturalHeight}))}else{let firstEnd=matches[0].aY;pieces.push({im:shots[0].im,sy:0,sh:firstEnd});for(let i=1;i<shots.length-1;i++){let sy=matches[i-1].bY,ey=matches[i].aY;if(ey<=sy+20){sy=0;ey=shots[i].im.naturalHeight}pieces.push({im:shots[i].im,sy,sh:ey-sy})}let sy=matches[matches.length-1].bY;pieces.push({im:shots.at(-1).im,sy,sh:shots.at(-1).im.naturalHeight-sy})}let heights=pieces.map(q=>Math.max(1,Math.round(q.sh*(w/q.im.naturalWidth)))),h=heights.reduce((a,b)=>a+b,0);if(h>30000){let k=30000/h;w=Math.max(1,Math.floor(w*k));heights=pieces.map(q=>Math.max(1,Math.round(q.sh*(w/q.im.naturalWidth))));h=heights.reduce((a,b)=>a+b,0)}let c=document.createElement('canvas');c.width=w;c.height=h;let ctx=c.getContext('2d'),y=0;pieces.forEach((q,i)=>{ctx.drawImage(q.im,0,q.sy,q.im.naturalWidth,q.sh,0,y,w,heights[i]);y+=heights[i]});c.toBlob(b=>{if(!b)return alert('画像が大きすぎます');if(surl)URL.revokeObjectURL(surl);surl=URL.createObjectURL(b);$('stOut').src=surl;$('stSave').href=surl;$('stMeta').textContent=`${w} × ${h} px ／ ${shots.length}枚`;$('stResult').classList.add('show');let avg=matches.length?matches.reduce((a,m)=>a+m.score,0)/matches.length:0;stat.textContent=auto?`シームレス結合完了（一致度 ${avg<8?'高':avg<18?'中':'低'}）`:'通常の縦結合で作成しました。';$('stResult').scrollIntoView({behavior:'smooth'})},'image/jpeg',.94)}
+'''
+          p.write_text(s[:start]+new+s[end:])
+          PY
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add image-tools/index.html
+          git diff --cached --quiet || git commit -m 'Improve seamless screenshot stitching'
+          git push
