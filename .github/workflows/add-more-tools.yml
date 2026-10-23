@@ -1,0 +1,51 @@
+name: Add more utility tools
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/add-more-tools.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add tools
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          # Calendar: date calculator in drawer/modal
+          p=Path('index.html'); s=p.read_text()
+          if 'id="dateCalcMenu"' not in s:
+            s=s.replace('<button class="menuItem" id="today">今日へ戻る</button>','<button class="menuItem" id="today">今日へ戻る</button><button class="menuItem" id="dateCalcMenu">日付・日数計算<small>○日後・○日前・日付の差</small></button>')
+            inject="""function dateCalcUI(){drawer(false);modal(head('日付・日数計算')+'<div class=\"list\"><b>① ○日後・○日前</b><input id=\"dcBase\" type=\"date\" style=\"width:100%;padding:11px;margin:8px 0;border:1px solid #ccc;border-radius:9px\"><div style=\"display:grid;grid-template-columns:1fr 90px;gap:8px\"><input id=\"dcDays\" type=\"number\" inputmode=\"numeric\" value=\"9\" style=\"padding:11px;border:1px solid #ccc;border-radius:9px\"><select id=\"dcDir\" style=\"border:1px solid #ccc;border-radius:9px\"><option value=\"1\">日後</option><option value=\"-1\">日前</option></select></div><button class=\"primary\" id=\"dcDo\">計算する</button><div id=\"dcOut\" style=\"font-size:25px;font-weight:800;text-align:center;padding:15px 0;color:#1769aa\"></div><hr style=\"border:0;border-top:1px solid #eee\"><b>② 2つの日付の差</b><div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px\"><input id=\"dcA\" type=\"date\" style=\"padding:9px;border:1px solid #ccc;border-radius:9px;min-width:0\"><input id=\"dcB\" type=\"date\" style=\"padding:9px;border:1px solid #ccc;border-radius:9px;min-width:0\"></div><button class=\"primary\" id=\"dcDiff\">日数を計算</button><div id=\"dcDiffOut\" style=\"font-size:22px;font-weight:800;text-align:center;padding:15px 0;color:#1769aa\"></div></div>');let td=new Date(),iso=td.getFullYear()+'-'+pad(td.getMonth()+1)+'-'+pad(td.getDate());$('dcBase').value=$('dcA').value=iso;$('dcDo').onclick=()=>{let d=new Date($('dcBase').value+'T00:00:00'),n=+$('dcDays').value*(+$('dcDir').value);if(isNaN(d))return;d.setDate(d.getDate()+n);$('dcOut').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日（'+['日','月','火','水','木','金','土'][d.getDay()]+'）'};$('dcDiff').onclick=()=>{let a=new Date($('dcA').value+'T00:00:00'),b=new Date($('dcB').value+'T00:00:00');if(isNaN(a)||isNaN(b))return;$('dcDiffOut').textContent=Math.abs(Math.round((b-a)/86400000))+'日間'}}$('dateCalcMenu').onclick=dateCalcUI;"""
+            s=s.replace('render()})();</script>',inject+'render()})();</script>')
+            p.write_text(s)
+          # Time calculator: cooking conversion tool
+          p=Path('time-calculator/index.html'); s=p.read_text()
+          if 'data-tool="cooking"' not in s:
+            s=s.replace('<button class="toolItem" data-tool="ratio">％ 割合・比例計算<small>100gで大さじ3 → 75gなら？</small></button>','<button class="toolItem" data-tool="ratio">％ 割合・比例計算<small>100gで大さじ3 → 75gなら？</small></button><button class="toolItem" data-tool="cooking">♨ 料理の分量変換<small>人数変更・大さじ/小さじ/ml換算</small></button>')
+            page='''<section class="app toolPage" id="cooking"><button class="btn backTool" data-back>← 時間の計算へ</button><div class="header">料理の分量変換</div><section class="card"><div class="title">人数を変える</div><div class="toolGrid"><div><div class="toolLabel">元の人数</div><input class="toolInput" id="cookFrom" inputmode="decimal" value="2"></div><div><div class="toolLabel">変更後の人数</div><input class="toolInput" id="cookTo" inputmode="decimal" value="3"></div></div><div class="toolLabel" style="margin-top:12px">元の材料の量</div><input class="toolInput" id="cookAmount" inputmode="decimal" value="200"><button class="btn primary" id="cookCalc" style="margin-top:12px">計算する</button><div class="toolResult" id="cookOut">300</div><div class="summary" id="cookSummary">2人分で200 → 3人分なら300</div></section><section class="card"><div class="title">大さじ・小さじ・ml換算</div><div class="toolGrid"><div><div class="toolLabel">数値</div><input class="toolInput" id="spoonNum" inputmode="decimal" value="1"></div><div><div class="toolLabel">単位</div><select class="toolInput" id="spoonUnit"><option value="tb">大さじ</option><option value="ts">小さじ</option><option value="ml">ml</option></select></div></div><button class="btn primary" id="spoonCalc" style="margin-top:12px">換算する</button><div class="convList" id="spoonOut"></div></section></section>'''
+            s=s.replace('<section class="app toolPage" id="ratio">',page+'<section class="app toolPage" id="ratio">',1)
+            js="""function cookCalc(){let a=+document.getElementById('cookFrom').value,b=+document.getElementById('cookTo').value,c=+document.getElementById('cookAmount').value;if(a<=0)return;let r=nice(c*b/a);document.getElementById('cookOut').textContent=r;document.getElementById('cookSummary').textContent=a+'人分で'+c+' → '+b+'人分なら'+r}document.getElementById('cookCalc').onclick=cookCalc;cookCalc();function spoonCalc(){let n=+document.getElementById('spoonNum').value,u=document.getElementById('spoonUnit').value,ml=u==='tb'?n*15:u==='ts'?n*5:n;document.getElementById('spoonOut').innerHTML='<div class=\"convRow\"><span>大さじ</span><b>'+nice(ml/15)+'</b></div><div class=\"convRow\"><span>小さじ</span><b>'+nice(ml/5)+'</b></div><div class=\"convRow\"><span>ml</span><b>'+nice(ml)+'ml</b></div>'}document.getElementById('spoonCalc').onclick=spoonCalc;spoonCalc();"""
+            s=s.replace('</script></body>',js+'</script></body>')
+            p.write_text(s)
+          # Price comparison: discount and quick normalized unit display
+          p=Path('price-compare/index.html'); s=p.read_text()
+          if 'id="discountTool"' not in s:
+            css='''.extraTool{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:15px;margin:13px 0;box-shadow:var(--shadow)}.extraTool h3{margin:0 0 12px}.extraGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.extraLabel{font-size:12px;color:var(--muted);font-weight:700;margin:4px}.extraBig{text-align:center;font-size:27px;font-weight:900;color:var(--blue);padding:14px 4px}.toolTabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:12px 0}.toolTabs button{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:12px;font-weight:800}.toolTabs button.active{background:var(--blue);color:#fff}'''
+            s=s.replace('</style>',css+'</style>')
+            tool='''<div class="toolTabs"><button id="showCompare" class="active">単価比較</button><button id="showDiscount">割引・ポイント</button></div><section class="extraTool" id="discountTool" style="display:none"><h3>割引・ポイント計算</h3><div class="extraGrid"><div><div class="extraLabel">元の値段（円）</div><input id="discPrice" inputmode="decimal" type="number" value="3980"></div><div><div class="extraLabel">割引（%）</div><input id="discPct" inputmode="decimal" type="number" value="20"></div><div><div class="extraLabel">さらに値引き（円）</div><input id="discYen" inputmode="decimal" type="number" value="0"></div><div><div class="extraLabel">ポイント還元（%）</div><input id="discPoint" inputmode="decimal" type="number" value="0"></div></div><button class="compare" id="discCalc" style="width:100%;margin-top:12px">計算する</button><div class="extraBig" id="discOut"></div><div id="discDetail" style="text-align:center;color:var(--muted)"></div></section><div id="compareArea">'''
+            s=s.replace('<p class="lead">容量と値段を入力するだけで、どっちがお得かすぐ分かります。</p>','<p class="lead">容量と値段を入力するだけで、どっちがお得かすぐ分かります。</p>'+tool)
+            s=s.replace('<section class="history">','</div><section class="history">',1)
+            s=s.replace('<button class="menuitem" id="clearHistory">','<button class="menuitem" id="openDiscount">％ 割引・ポイント計算</button><button class="menuitem" id="clearHistory">')
+            s=s.replace("<small>1${x.unit}あたり</small>","<small>${x.unit==='g'?100:x.unit==='ml'?100:1}${x.unit}あたり</small>")
+            s=s.replace("<div class=\"unitprice\">${yen(x.per)}円</div>","<div class=\"unitprice\">${yen(x.per*(x.unit==='g'||x.unit==='ml'?100:1))}円</div>")
+            extra="""const compareArea=document.getElementById('compareArea'),discountTool=document.getElementById('discountTool'),showCompare=document.getElementById('showCompare'),showDiscount=document.getElementById('showDiscount');function switchPriceTool(d){discountTool.style.display=d?'block':'none';compareArea.style.display=d?'none':'block';showDiscount.classList.toggle('active',d);showCompare.classList.toggle('active',!d)}showCompare.onclick=()=>switchPriceTool(false);showDiscount.onclick=()=>switchPriceTool(true);document.getElementById('openDiscount').onclick=()=>{document.getElementById('drawer').classList.remove('open');switchPriceTool(true);window.scrollTo(0,0)};function discountCalc(){let p=+document.getElementById('discPrice').value||0,d=+document.getElementById('discPct').value||0,y=+document.getElementById('discYen').value||0,pt=+document.getElementById('discPoint').value||0;let paid=Math.max(0,p*(1-d/100)-y),points=paid*pt/100,effective=Math.max(0,paid-points);document.getElementById('discOut').textContent='実質 '+yen(effective)+'円';document.getElementById('discDetail').textContent='支払 '+yen(paid)+'円'+(pt?' ／ 還元 約'+yen(points)+'円相当':'')}document.getElementById('discCalc').onclick=discountCalc;discountCalc();"""
+            s=s.replace('</script>',extra+'</script>')
+            p.write_text(s)
+          PY
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add index.html time-calculator/index.html price-compare/index.html
+          git diff --cached --quiet || (git commit -m 'Add date cooking discount and unit tools' && git push)
